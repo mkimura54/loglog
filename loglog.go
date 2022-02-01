@@ -1,10 +1,12 @@
 package loglog
 
 import (
+	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -21,6 +23,9 @@ var RetrySeconds int = 10
 // IsAutoDelete はログの自動削除機能(ログ出力時に実行)を有効にするかどうか
 var IsAutoDelete bool
 
+// IsTrimNewLine は出力メッセージの改行コードを除去するかどうか
+var IsTrimNewLine bool = true
+
 // KeepDays はログ保持期間
 var KeepDays = 14
 
@@ -29,6 +34,15 @@ var Directory = "log"
 
 // lastDeleteDay は最後にログ削除関数を実行した日付(yyyyMMdd)
 var lastDeleteDay string
+
+// spaces はIsTrimNewLine=falseで出力するときのインデント用スペース文字列
+var spaces = fmt.Sprintf("%"+strconv.Itoa(len("2006/01/02 15:01:02 : "))+"s", "")
+
+const (
+	CR   = "\r"
+	LF   = "\n"
+	CRLF = CR + LF
+)
 
 // Write はログ出力
 func Write(message string) bool {
@@ -60,8 +74,24 @@ retry:
 }
 
 func write(f *os.File, message string) {
-	message = strings.Replace(message, "\n", "", -1)
-	message = strings.Replace(message, "\r", "", -1)
+	if IsTrimNewLine {
+		message = strings.Replace(message, LF, "", -1)
+		message = strings.Replace(message, CR, "", -1)
+	} else {
+		var newMessage string
+		msg := strings.Split(message, LF)
+		for i, m := range msg {
+			if i == 0 {
+				newMessage += m
+			} else {
+				temp := strings.Replace(m, CR, "", -1)
+				if temp != "" {
+					newMessage += LF + spaces + temp
+				}
+			}
+		}
+		message = newMessage
+	}
 	logger := log.New(f, "", log.Ldate|log.Ltime)
 	logger.Println(": " + message)
 }
